@@ -1,0 +1,8 @@
+version: "3"
+tasks:
+  seed_database:
+    cmd: "docker-compose -f docker-compose.dev.yml exec app python seed_database.py"
+  run:
+    cmd: "docker-compose -f docker-compose.dev.yml up -d --build"
+  down:
+    cmd: "docker-compose -f docker-compose.dev.yml down"
