@@ -18,8 +18,8 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.api_ecom_flutter.rule=Host(`api-ecom-flutter.jboureux.fr`)"
-      - "trafik.http.routers.api_ecom_flutter.entrypoints=websecure"
-      - "trafik.http.routers.api_ecom_flutter.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.api_ecom_flutter.entrypoints=websecure"
+      - "traefik.http.routers.api_ecom_flutter.tls.certresolver=letsencrypt"
       - "traefik.docker.network=traefik-proxy"
 
   db:
