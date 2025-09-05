@@ -4,9 +4,9 @@ services:
       context: .
       dockerfile: Dockerfile.dev
     ports:
-      - 8000:8000
+      - 8088:8000
     environment:
-      DATABASE_URL: "postgresql://postgres:postgres@db:5432/postgres"
+      DATABASE_URL: "postgresql://postgres:postgres@db:5565/postgres"
     volumes:
       - .:/app
     depends_on:
@@ -25,7 +25,7 @@ services:
   db:
     image: postgres
     ports:
-      - 5432:5432
+      - 5565:5432
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
