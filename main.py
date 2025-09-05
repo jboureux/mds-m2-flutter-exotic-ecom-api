@@ -9,6 +9,8 @@ from models.product import Product, ProductCreate, ProductRead, ProductUpdate, P
 from models.cart import Cart, CartProduct, CartCreate, CartRead, CartProductCreate, CartProductUpdate, CartProductRead, CartWithProducts
 from typing import Annotated, Optional, List
 from fastapi import Depends
+from fastapi.middleware.cors import CORSMiddleware
+
 
 database_url = os.getenv("DATABASE_URL")
 
@@ -31,7 +33,40 @@ def get_session():
 
 
 
-app = FastAPI()
+tags_metadata = [
+    {
+        "name": "Products",
+        "description": "Opérations sur les produits : création, lecture, mise à jour et suppression. Inclut également la gestion des catégories.",
+    },
+    {
+        "name": "Carts",
+        "description": "Gestion des paniers d'achat : création, gestion des produits dans le panier, et opérations utilisateur.",
+    },
+    {
+        "name": "Images",
+        "description": "Upload et récupération d'images pour les produits.",
+    },
+]
+
+app = FastAPI(
+    title="E-commerce API",
+    description="API complète pour une application e-commerce avec gestion des produits, paniers et images",
+    version="1.0.0",
+    openapi_tags=tags_metadata
+)
+
+# Configuration CORS
+origins = [
+    "*"
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.on_event("startup")
 def on_startup():
@@ -47,7 +82,7 @@ def read_root():
 SessionDep = Annotated[Session, Depends(get_session)]
 
 # Endpoints Products
-@app.post("/products", response_model=ProductRead)
+@app.post("/products", response_model=ProductRead, tags=["Products"])
 def create_product(product: ProductCreate, session: SessionDep):
     db_product = Product.model_validate(product)
     session.add(db_product)
@@ -55,7 +90,7 @@ def create_product(product: ProductCreate, session: SessionDep):
     session.refresh(db_product)
     return db_product
 
-@app.get("/products", response_model=ProductsResponse)
+@app.get("/products", response_model=ProductsResponse, tags=["Products"])
 def get_products(
     session: SessionDep,
     limit: Optional[int] = Query(None, ge=1, description="Nombre de produits à récupérer"),
@@ -103,14 +138,14 @@ def get_products(
     
     return ProductsResponse(products=products, total=total)
 
-@app.get("/products/{product_id}", response_model=ProductRead)
+@app.get("/products/{product_id}", response_model=ProductRead, tags=["Products"])
 def get_product(product_id: int, session: SessionDep):
     product = session.get(Product, product_id)
     if not product:
         raise HTTPException(status_code=404, detail="Produit non trouvé")
     return product
 
-@app.patch("/products/{product_id}", response_model=ProductRead)
+@app.patch("/products/{product_id}", response_model=ProductRead, tags=["Products"])
 def update_product(product_id: int, product_update: ProductUpdate, session: SessionDep):
     product = session.get(Product, product_id)
     if not product:
@@ -125,7 +160,7 @@ def update_product(product_id: int, product_update: ProductUpdate, session: Sess
     session.refresh(product)
     return product
 
-@app.delete("/products/{product_id}")
+@app.delete("/products/{product_id}", tags=["Products"])
 def delete_product(product_id: int, session: SessionDep):
     product = session.get(Product, product_id)
     if not product:
@@ -135,8 +170,21 @@ def delete_product(product_id: int, session: SessionDep):
     session.commit()
     return {"message": "Produit supprimé avec succès"}
 
+@app.get("/categories", response_model=List[str], tags=["Products"])
+def get_categories(session: SessionDep):
+    """Récupère toutes les catégories distinctes de produits"""
+    categories = session.exec(
+        select(Product.category).distinct()
+    ).all()
+    
+    # Filtrer les catégories None et trier par ordre alphabétique
+    categories = [cat for cat in categories if cat is not None]
+    categories.sort()
+    
+    return categories
+
 # Endpoints Cart
-@app.post("/carts", response_model=CartRead)
+@app.post("/carts", response_model=CartRead, tags=["Carts"])
 def create_cart(cart: CartCreate, session: SessionDep):
     db_cart = Cart.model_validate(cart)
     session.add(db_cart)
@@ -144,14 +192,14 @@ def create_cart(cart: CartCreate, session: SessionDep):
     session.refresh(db_cart)
     return db_cart
 
-@app.get("/carts/{cart_id}", response_model=CartRead)
+@app.get("/carts/{cart_id}", response_model=CartRead, tags=["Carts"])
 def get_cart(cart_id: int, session: SessionDep):
     cart = session.get(Cart, cart_id)
     if not cart:
         raise HTTPException(status_code=404, detail="Panier non trouvé")
     return cart
 
-@app.get("/carts/{cart_id}/products", response_model=list[CartProductRead])
+@app.get("/carts/{cart_id}/products", response_model=list[CartProductRead], tags=["Carts"])
 def get_cart_products(cart_id: int, session: SessionDep):
     cart = session.get(Cart, cart_id)
     if not cart:
@@ -162,7 +210,7 @@ def get_cart_products(cart_id: int, session: SessionDep):
     ).all()
     return cart_products
 
-@app.get("/carts/{cart_id}/details", response_model=CartWithProducts)
+@app.get("/carts/{cart_id}/details", response_model=CartWithProducts, tags=["Carts"])
 def get_cart_with_products(cart_id: int, session: SessionDep):
     cart = session.get(Cart, cart_id)
     if not cart:
@@ -178,12 +226,12 @@ def get_cart_with_products(cart_id: int, session: SessionDep):
     
     return CartWithProducts(**cart_data)
 
-@app.get("/carts/user/{user_id}", response_model=list[CartRead])
+@app.get("/carts/user/{user_id}", response_model=list[CartRead], tags=["Carts"])
 def get_user_carts(user_id: str, session: SessionDep):
     carts = session.exec(select(Cart).where(Cart.user_id == user_id)).all()
     return carts
 
-@app.get("/carts/user/{user_id}/active", response_model=CartRead)
+@app.get("/carts/user/{user_id}/active", response_model=CartRead, tags=["Carts"])
 def get_user_active_cart(user_id: str, session: SessionDep):
     """Récupère le panier actif de l'utilisateur, ou en crée un nouveau s'il n'en existe pas"""
     cart = session.exec(
@@ -202,7 +250,7 @@ def get_user_active_cart(user_id: str, session: SessionDep):
     
     return cart
 
-@app.post("/carts/{cart_id}/products")
+@app.post("/carts/{cart_id}/products", tags=["Carts"])
 def add_product_to_cart(cart_id: int, cart_product: CartProductCreate, session: SessionDep):
     # Vérifier que le panier existe
     cart = session.get(Cart, cart_id)
@@ -248,7 +296,7 @@ def add_product_to_cart(cart_id: int, cart_product: CartProductCreate, session: 
     
     return {"message": "Produit ajouté au panier avec succès"}
 
-@app.patch("/carts/{cart_id}/products/{product_id}")
+@app.patch("/carts/{cart_id}/products/{product_id}", tags=["Carts"])
 def update_cart_product(cart_id: int, product_id: int, update_data: CartProductUpdate, session: SessionDep):
     cart_product = session.exec(
         select(CartProduct).where(
@@ -276,7 +324,7 @@ def update_cart_product(cart_id: int, product_id: int, update_data: CartProductU
     
     return {"message": "Quantité mise à jour avec succès"}
 
-@app.delete("/carts/{cart_id}/products/{product_id}")
+@app.delete("/carts/{cart_id}/products/{product_id}", tags=["Carts"])
 def remove_product_from_cart(cart_id: int, product_id: int, session: SessionDep):
     cart_product = session.exec(
         select(CartProduct).where(
@@ -304,7 +352,7 @@ def remove_product_from_cart(cart_id: int, product_id: int, session: SessionDep)
     return {"message": "Produit retiré du panier avec succès"}
 
 # Endpoints Images
-@app.post("/images/upload")
+@app.post("/images/upload", tags=["Images"])
 async def upload_image(file: UploadFile = File(...)):
     """Uploader une image dans le dossier data/images"""
     
@@ -335,7 +383,7 @@ async def upload_image(file: UploadFile = File(...)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erreur lors de l'upload: {str(e)}")
 
-@app.get("/images/{filename}")
+@app.get("/images/{filename}", tags=["Images"])
 async def get_image(filename: str):
     """Récupérer une image par son nom de fichier"""
     
