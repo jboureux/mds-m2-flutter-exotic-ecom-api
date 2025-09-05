@@ -351,6 +351,58 @@ def remove_product_from_cart(cart_id: int, product_id: int, session: SessionDep)
     
     return {"message": "Produit retiré du panier avec succès"}
 
+@app.delete("/carts/{cart_id}/clear", tags=["Carts"])
+def clear_cart(cart_id: int, session: SessionDep):
+    """Vide complètement le panier en supprimant tous les produits"""
+    # Vérifier que le panier existe
+    cart = session.get(Cart, cart_id)
+    if not cart:
+        raise HTTPException(status_code=404, detail="Panier non trouvé")
+    
+    # Supprimer tous les produits du panier
+    cart_products = session.exec(
+        select(CartProduct).where(CartProduct.cart_id == cart_id)
+    ).all()
+    
+    for cart_product in cart_products:
+        session.delete(cart_product)
+    
+    # Remettre le prix total à 0
+    cart.total_price = 0.0
+    session.add(cart)
+    session.commit()
+    
+    return {"message": "Panier vidé avec succès"}
+
+@app.delete("/carts/user/{user_id}/clear", tags=["Carts"])
+def clear_user_active_cart(user_id: str, session: SessionDep):
+    """Vide le panier actif de l'utilisateur"""
+    # Récupérer le panier actif de l'utilisateur
+    cart = session.exec(
+        select(Cart).where(
+            Cart.user_id == user_id,
+            Cart.status == "active"
+        )
+    ).first()
+    
+    if not cart:
+        raise HTTPException(status_code=404, detail="Aucun panier actif trouvé pour cet utilisateur")
+    
+    # Supprimer tous les produits du panier
+    cart_products = session.exec(
+        select(CartProduct).where(CartProduct.cart_id == cart.id)
+    ).all()
+    
+    for cart_product in cart_products:
+        session.delete(cart_product)
+    
+    # Remettre le prix total à 0
+    cart.total_price = 0.0
+    session.add(cart)
+    session.commit()
+    
+    return {"message": "Panier actif de l'utilisateur vidé avec succès"}
+
 # Endpoints Images
 @app.post("/images/upload", tags=["Images"])
 async def upload_image(file: UploadFile = File(...)):
