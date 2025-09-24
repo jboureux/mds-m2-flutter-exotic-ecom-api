@@ -6,7 +6,7 @@ import uuid
 from pathlib import Path
 from sqlmodel import create_engine, Session, select, SQLModel, func, or_
 from models.product import Product, ProductCreate, ProductRead, ProductUpdate, ProductsResponse
-from models.cart import Cart, CartProduct, CartCreate, CartRead, CartProductCreate, CartProductUpdate, CartProductRead, CartWithProducts
+from models.cart import Cart, CartProduct, CartCreate, CartRead, CartProductCreate, CartProductUpdate, CartProductRead, CartWithProducts, CartProductWithDetails
 from typing import Annotated, Optional, List
 from fastapi import Depends
 from fastapi.middleware.cors import CORSMiddleware
@@ -199,16 +199,31 @@ def get_cart(cart_id: int, session: SessionDep):
         raise HTTPException(status_code=404, detail="Panier non trouvé")
     return cart
 
-@app.get("/carts/{cart_id}/products", response_model=list[CartProductRead], tags=["Carts"])
+@app.get("/carts/{cart_id}/products", response_model=list[CartProductWithDetails], tags=["Carts"])
 def get_cart_products(cart_id: int, session: SessionDep):
     cart = session.get(Cart, cart_id)
     if not cart:
         raise HTTPException(status_code=404, detail="Panier non trouvé")
     
-    cart_products = session.exec(
-        select(CartProduct).where(CartProduct.cart_id == cart_id)
-    ).all()
-    return cart_products
+    # Faire une jointure entre CartProduct et Product pour récupérer les détails
+    query = select(CartProduct, Product).join(Product).where(CartProduct.cart_id == cart_id)
+    results = session.exec(query).all()
+    
+    # Construire la réponse avec les détails du produit
+    cart_products_with_details = []
+    for cart_product, product in results:
+        cart_product_detail = CartProductWithDetails(
+            product_id=cart_product.product_id,
+            quantity=cart_product.quantity,
+            cart_id=cart_product.cart_id,
+            price_at_time=cart_product.price_at_time,
+            product_name=product.title,
+            product_thumbnail=product.thumbnail,
+            product_images=product.images
+        )
+        cart_products_with_details.append(cart_product_detail)
+    
+    return cart_products_with_details
 
 @app.get("/carts/{cart_id}/details", response_model=CartWithProducts, tags=["Carts"])
 def get_cart_with_products(cart_id: int, session: SessionDep):

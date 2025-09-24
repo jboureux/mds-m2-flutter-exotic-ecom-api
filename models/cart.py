@@ -49,6 +49,15 @@ class CartProductCreate(SQLModel):
 class CartProductUpdate(SQLModel):
     quantity: int = Field(gt=0)
 
+# Modèle enrichi pour les réponses avec détails du produit
+class CartProductWithDetails(CartProductBase):
+    cart_id: int
+    price_at_time: float
+    # Informations du produit
+    product_name: str
+    product_thumbnail: str
+    product_images: List[str]
+
 # Modèle enrichi pour les réponses avec détails
 class CartWithProducts(CartRead):
     products: List[CartProductRead] = []
